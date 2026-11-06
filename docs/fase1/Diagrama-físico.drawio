@@ -1,0 +1,100 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="_cecL9MldGDX-BgP1gIv" name="Página-1">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-24" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;strokeColor=light-dark(#000000,#4D4D4D);" value="" vertex="1">
+          <mxGeometry height="600" width="627.37" x="100" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;" value="" vertex="1">
+          <mxGeometry height="510" width="600" x="117.37" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;strokeColor=light-dark(#000000,#007FFF);" value="" vertex="1">
+          <mxGeometry height="430" width="580" x="127.38" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontSize=15;" value="&lt;b&gt;SERVIDOR / COMPUTADOR&lt;/b&gt;" vertex="1">
+          <mxGeometry height="30" width="209" x="312.88" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;strokeColor=light-dark(#000000,#66B2FF);" value="&lt;font style=&quot;font-size: 15px;&quot;&gt;DOCKER COMPOSE&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="560" x="137.38" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-5" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 15px;&quot;&gt;&lt;u style=&quot;&quot;&gt;Contenedores Docker&lt;/u&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="154.75" x="340" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;strokeColor=light-dark(#000000,#FFF2CC);" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;GATEWAY&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="560" x="137.39" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;strokeColor=light-dark(#000000,#FFF2CC);" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;Balanceador&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="560" x="137.39" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;strokeColor=light-dark(#000000,#B9E0A5);" value="&lt;p&gt;&lt;b&gt;App 1&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(#000000, var(--ge-light-color, #ffffff));&quot;&gt;Contenedor&lt;/span&gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="220" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;strokeColor=light-dark(#000000,#B9E0A5);" value="&lt;p&gt;&lt;b&gt;App 2&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(#000000, var(--ge-light-color, #ffffff));&quot;&gt;Contenedor&lt;/span&gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="494.75" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-12" edge="1" parent="1" source="oO0Ge9ESOip5kSi5rTLc-6" style="endArrow=classic;html=1;rounded=0;defaultLabelBackgroundColor=page;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" target="oO0Ge9ESOip5kSi5rTLc-9" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="411.37" y="380" as="sourcePoint" />
+            <mxPoint x="461.37" y="330" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-13" edge="1" parent="1" source="oO0Ge9ESOip5kSi5rTLc-10" style="endArrow=none;html=1;rounded=0;defaultLabelBackgroundColor=page;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="oO0Ge9ESOip5kSi5rTLc-9" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="407.37" y="390" as="sourcePoint" />
+            <mxPoint x="457.37" y="340" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-14" edge="1" parent="1" source="oO0Ge9ESOip5kSi5rTLc-11" style="endArrow=none;html=1;rounded=0;defaultLabelBackgroundColor=page;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0;exitY=0;exitDx=0;exitDy=0;" target="oO0Ge9ESOip5kSi5rTLc-9" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="387.37" y="411" as="sourcePoint" />
+            <mxPoint x="468.37" y="370" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-16" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="RED INTERNA DOCKER" vertex="1">
+          <mxGeometry height="40" width="157.38" x="337.37" y="425" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-17" edge="1" parent="1" source="oO0Ge9ESOip5kSi5rTLc-10" style="endArrow=classic;html=1;rounded=0;defaultLabelBackgroundColor=page;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0.374;entryY=0.013;entryDx=0;entryDy=0;entryPerimeter=0;" target="oO0Ge9ESOip5kSi5rTLc-16" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="347.37" y="400" as="sourcePoint" />
+            <mxPoint x="397.37" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-18" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;defaultLabelBackgroundColor=page;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.648;entryY=0.025;entryDx=0;entryDy=0;entryPerimeter=0;" target="oO0Ge9ESOip5kSi5rTLc-16" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="497.38603896932125" y="398.843961030679" as="sourcePoint" />
+            <mxPoint x="437.46367999999995" y="430" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-19" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;strokeColor=light-dark(#000000,#FFF2CC);" value="&lt;p&gt;DB Primaria&lt;br&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(#000000, var(--ge-light-color, #ffffff));&quot;&gt;Contenedor&lt;/span&gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="257.37" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-20" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;strokeColor=light-dark(#000000,#A9C4EB);" value="&lt;p&gt;DB Réplica&lt;br&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(#000000, var(--ge-light-color, #ffffff));&quot;&gt;Contenedor&lt;/span&gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="457.37" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-21" edge="1" parent="1" source="oO0Ge9ESOip5kSi5rTLc-19" style="endArrow=none;html=1;rounded=0;defaultLabelBackgroundColor=page;" target="oO0Ge9ESOip5kSi5rTLc-16" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="317.37" y="520" as="sourcePoint" />
+            <mxPoint x="367.37" y="470" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-22" edge="1" parent="1" source="oO0Ge9ESOip5kSi5rTLc-20" style="endArrow=none;html=1;rounded=0;defaultLabelBackgroundColor=page;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" target="oO0Ge9ESOip5kSi5rTLc-16" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="417.37" y="550" as="sourcePoint" />
+            <mxPoint x="467.37" y="500" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-23" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&#xa;Primaria → Réplica (replicación)&#xa;&#xa;" vertex="1">
+          <mxGeometry height="30" width="186" x="324.38" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-25" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;h2&gt;BODEGA EXPRESS&lt;br&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(#000000, var(--ge-light-color, #ffffff)); font-size: 12px; font-weight: normal;&quot;&gt;Diagrama de arquitectura física&lt;/span&gt;&lt;/h2&gt;" vertex="1">
+          <mxGeometry height="30" width="226.75" x="304.01" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oO0Ge9ESOip5kSi5rTLc-26" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;div&gt;&lt;div&gt;&lt;span style=&quot;color: light-dark(rgb(0, 0, 0), rgb(255, 0, 0));&quot;&gt;SPOF: servidor físico&lt;/span&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;&lt;span style=&quot;background-color: transparent;&quot;&gt;&lt;span style=&quot;color: light-dark(rgb(0, 0, 0), rgb(255, 0, 0));&quot;&gt;SPOF: gateway&lt;/span&gt;&lt;br&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(#000000, var(--ge-light-color, #ffffff));&quot;&gt;También marca el balanceador y la primaria como puntos únicos de falla.&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="392" x="221.37" y="600" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
