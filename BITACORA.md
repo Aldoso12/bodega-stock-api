@@ -11,3 +11,7 @@
 - **Dónde me trabé:** Sin dificultades importantes durante la elaboración de los requisitos y cálculos.
 - **Qué haré la próxima clase:** Elaborar y revisar los diagramas lógico y físico de la arquitectura.
 - **Uso de IA:** Se utilizó IA para estructurar los requisitos y apoyar los cálculos de estimación. Se revisó el contenido y se adaptó al proyecto.
+
+## Viernes 6 de Noviembre de 2026
+- **Qué hice hoy:** Elaboración de los diagramas lógico y físico de la arquitectura y exportación de ambos a formato PNG.
+- **Archivos y organización:** Se conservaron los archivos editables en formato Draw.io y se organizaron los cuatro archivos dentro de `docs/fase1/`, quedando posteriormente visibles en el repositorio de GitHub.
