@@ -15,3 +15,7 @@
 ## Viernes 6 de Noviembre de 2026
 - **Qué hice hoy:** Elaboración de los diagramas lógico y físico de la arquitectura y exportación de ambos a formato PNG.
 - **Archivos y organización:** Se conservaron los archivos editables en formato Draw.io y se organizaron los cuatro archivos dentro de `docs/fase1/`, quedando posteriormente visibles en el repositorio de GitHub.
+
+## Miércoles 11 de Noviembre de 2026
+- **Qué hice hoy:** Cierre y entrega de la Fase 1, con la finalización de `docs/fase1/REQUISITOS.md` —incluyendo la estimación de carga y almacenamiento— y la creación y revisión de `docs/fase1/DISENO.md`.
+- **Archivos y organización:** Se revisaron los diagramas lógico y físico en PNG y Draw.io, se creó `PRESENTACION BODEGA EXPRESS.pptx` y se prepararon los entregables de la Fase 1 para su publicación en GitHub.
