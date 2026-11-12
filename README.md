@@ -18,7 +18,19 @@ Copy-Item .env.example .env
 
 El archivo `.env` contiene las variables necesarias para levantar la arquitectura y está excluido de Git mediante `.gitignore`. Las contraseñas y la API Key del ejemplo son únicamente valores locales de desarrollo y deben reemplazarse en un entorno real.
 
-Para un entorno de desarrollo, el valor de `API_KEY` de `.env` debe coincidir con el encabezado usado en las pruebas. No se deben guardar credenciales reales en archivos versionados.
+Para las pruebas, la API Key se lee desde `.env` y se mantiene en la variable `$apiKey`, sin mostrar su valor:
+
+```powershell
+$apiKey = (Get-Content .env |
+  Where-Object { $_ -match '^API_KEY=' } |
+  Select-Object -First 1) -replace '^API_KEY=', ''
+$apiKey = $apiKey.Trim()
+if ([string]::IsNullOrWhiteSpace($apiKey)) {
+  throw 'API_KEY no está definida en .env'
+}
+```
+
+No se deben guardar credenciales reales en archivos versionados.
 
 ## Levantar la arquitectura
 
@@ -60,19 +72,19 @@ curl.exe --max-time 5 -i http://localhost:8080/
 Una petición con API Key válida debe pasar al balanceador y conservar `X-Instance`:
 
 ```powershell
-curl.exe --max-time 5 -i -H "X-API-Key: change_me_gateway" http://localhost:8080/
+curl.exe --max-time 5 -i -H "X-API-Key: $apiKey" http://localhost:8080/
 ```
 
 Realizar varias peticiones autorizadas y observar la alternancia round-robin:
 
 ```powershell
-1..6 | ForEach-Object { curl.exe --max-time 5 -sS -D - -o NUL -H "X-API-Key: change_me_gateway" http://localhost:8080/ | Select-String '^X-Instance:' }
+1..6 | ForEach-Object { curl.exe --max-time 5 -sS -D - -o NUL -H "X-API-Key: $apiKey" http://localhost:8080/ | Select-String '^X-Instance:' }
 ```
 
 Una petición con una clave incorrecta también debe devolver `401`:
 
 ```powershell
-curl.exe --max-time 5 -i -H "X-API-Key: wrong-key" http://localhost:8080/
+curl.exe --max-time 5 -i -H "X-API-Key: clave-no-valida" http://localhost:8080/
 ```
 
 El gateway es el único servicio publicado al equipo anfitrión. El balanceador conserva `expose` implícito dentro de la red Docker y no tiene un puerto publicado directamente.
@@ -83,7 +95,7 @@ Esta prueba fue ejecutada satisfactoriamente. Se detuvo temporalmente `app1`; du
 
 ```powershell
 docker compose stop app1
-1..6 | ForEach-Object { curl.exe --max-time 5 -sS -D - -o NUL -H "X-API-Key: change_me_gateway" http://localhost:8080/ | Select-String '^HTTP/|^X-Instance:' }
+1..6 | ForEach-Object { curl.exe --max-time 5 -sS -D - -o NUL -H "X-API-Key: $apiKey" http://localhost:8080/ | Select-String '^HTTP/|^X-Instance:' }
 docker compose start app1
 docker compose ps
 ```
@@ -116,10 +128,19 @@ X-Instance: app-2
 2. Escribir un dato en la primaria:
 
    ```powershell
-   docker compose exec db-primary psql -U bodega_admin -d bodega -c "CREATE TABLE IF NOT EXISTS replication_check (id integer PRIMARY KEY, message text NOT NULL); INSERT INTO replication_check (id, message) VALUES (1, 'streaming-ok') ON CONFLICT (id) DO UPDATE SET message = EXCLUDED.message;"
+   docker compose exec db-primary psql -U bodega_admin -d bodega -c "CREATE TABLE IF NOT EXISTS prueba_replicacion (id integer PRIMARY KEY, mensaje text NOT NULL); INSERT INTO prueba_replicacion (id, mensaje) VALUES (1, 'Prueba de replicacion Bodega Express') ON CONFLICT (id) DO UPDATE SET mensaje = EXCLUDED.mensaje;"
    ```
 
-3. Confirmar mediante SQL que la réplica está en recuperación:
+3. Confirmar mediante SQL que el mismo registro llegó a la réplica:
+
+   ```powershell
+   docker compose exec db-replica psql -U bodega_admin -d bodega -tAc "SELECT id, mensaje FROM prueba_replicacion WHERE id = 1;"
+   ```
+
+   La réplica debe mostrar el registro con ID `1` y el mensaje `Prueba de replicacion Bodega Express`.
+   Esto demuestra que recibe las escrituras realizadas en la primaria.
+
+4. Confirmar opcionalmente que la réplica está en recuperación:
 
    ```powershell
    docker compose exec db-replica psql -U bodega_admin -d bodega -tAc "SELECT pg_is_in_recovery();"
@@ -127,20 +148,37 @@ X-Instance: app-2
 
    El resultado esperado es `t`.
 
-4. Confirmar mediante SQL que el dato llegó a la réplica:
-
-   ```powershell
-   docker compose exec db-replica psql -U bodega_admin -d bodega -tAc "SELECT id || ':' || message FROM replication_check WHERE id = 1;"
-   ```
-
-   El resultado esperado es `1:streaming-ok`.
-
 5. Consultar el estado de envío y recepción en las bases:
 
    ```powershell
    docker compose exec db-primary psql -U bodega_admin -d bodega -c "SELECT client_addr, state, sync_state FROM pg_stat_replication;"
    docker compose exec db-replica psql -U bodega_admin -d bodega -c "SELECT status, sender_host, slot_name FROM pg_stat_wal_receiver;"
    ```
+
+## Tolerancia a fallos con `app2`
+
+Detener `app2`, realizar cinco peticiones autorizadas y comprobar que el Gateway continúa
+respondiendo desde `app-1` mediante `X-Instance`:
+
+```powershell
+docker compose stop app2
+1..5 | ForEach-Object { curl.exe --max-time 5 -sS -D - -o NUL -H "X-API-Key: $apiKey" http://localhost:8080/ | Select-String '^HTTP/|^X-Instance:' }
+```
+
+Las solicitudes deben responder HTTP 200 y mostrar `X-Instance: app-1`. Restaurar `app2` y
+comprobar nuevamente el estado de los servicios:
+
+```powershell
+docker compose start app2
+docker compose ps
+```
+
+Para restaurar `app1` después de su prueba de caída:
+
+```powershell
+docker compose start app1
+docker compose ps
+```
 
 ## Detener la arquitectura
 

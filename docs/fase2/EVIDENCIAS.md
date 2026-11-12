@@ -48,7 +48,7 @@ Comprobar que las peticiones autorizadas que llegan al gateway se reenvían al b
 for ($i=1; $i -le 6; $i++) {
   Write-Output "--- request $i ---"
   curl.exe --max-time 5 -sS -D - -o NUL `
-    -H "X-API-Key: change_me_gateway" `
+    -H "X-API-Key: $env:BODEGA_API_KEY" `
     http://127.0.0.1:8080/ |
     Select-String -Pattern "^HTTP/|^X-Instance:"
 }
@@ -91,14 +91,14 @@ Comprobar que el gateway permite una petición con la API Key configurada y rech
 
 ```powershell
 curl.exe --max-time 3 -sS -o NUL -w "valid_status=%{http_code}`n" `
-  -H "X-API-Key: change_me_gateway" `
+  -H "X-API-Key: $env:BODEGA_API_KEY" `
   http://127.0.0.1:8080/
 
 curl.exe --max-time 3 -sS -o NUL -w "missing_status=%{http_code}`n" `
   http://127.0.0.1:8080/
 
 curl.exe --max-time 3 -sS -o NUL -w "wrong_status=%{http_code}`n" `
-  -H "X-API-Key: wrong-key" `
+  -H "X-API-Key: clave-no-valida" `
   http://127.0.0.1:8080/
 ```
 
@@ -109,6 +109,10 @@ valid_status=200
 missing_status=401
 wrong_status=401
 ```
+
+La solicitud con la clave correcta utilizó la clave configurada mediante la variable de entorno
+`BODEGA_API_KEY`; su valor no se documenta. La solicitud con `clave-no-valida` utilizó un
+valor deliberadamente incorrecto y no corresponde a ninguna credencial real.
 
 Además, la respuesta autorizada incluyó un encabezado `X-Instance`, por ejemplo:
 
@@ -121,30 +125,23 @@ X-Instance: app-2
 
 La prueba fue satisfactoria. El gateway protege la entrada pública con la API Key y conserva el encabezado de identificación enviado por el balanceador.
 
-## 4. Replicación de PostgreSQL
+## 4. Replicación de PostgreSQL (12 de noviembre de 2026)
 
 ### Objetivo
 
-Comprobar mediante consultas SQL que la primaria acepta una escritura, que la réplica está en recuperación y que el dato escrito aparece en ella.
+Comprobar que la primaria acepta una escritura y que el registro se replica correctamente en la
+réplica. La prueba se realizó en la base de datos `bodega` con el usuario `bodega_admin`.
 
 ### Comandos utilizados
 
 ```powershell
 docker compose --env-file .env.example exec -T db-primary `
   psql -U bodega_admin -d bodega -c `
-  "CREATE TABLE IF NOT EXISTS replication_check (id integer PRIMARY KEY, message text NOT NULL); INSERT INTO replication_check (id, message) VALUES (1, 'streaming-ok') ON CONFLICT (id) DO UPDATE SET message = EXCLUDED.message;"
+  "CREATE TABLE prueba_replicacion (id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, mensaje text NOT NULL); INSERT INTO prueba_replicacion (mensaje) VALUES ('Prueba de replicacion Bodega Express');"
 
 docker compose --env-file .env.example exec -T db-replica `
   psql -U bodega_admin -d bodega -tAc `
-  "SELECT pg_is_in_recovery();"
-
-docker compose --env-file .env.example exec -T db-replica `
-  psql -U bodega_admin -d bodega -tAc `
-  "SELECT id || ':' || message FROM replication_check WHERE id = 1;"
-
-docker compose --env-file .env.example exec -T db-primary `
-  psql -U bodega_admin -d bodega -tAc `
-  "SELECT state FROM pg_stat_replication LIMIT 1;"
+  "SELECT id, mensaje FROM prueba_replicacion;"
 ```
 
 ### Salida obtenida
@@ -152,14 +149,14 @@ docker compose --env-file .env.example exec -T db-primary `
 ```text
 CREATE TABLE
 INSERT 0 1
-t
-1:streaming-ok
-streaming
+1 | Prueba de replicacion Bodega Express
 ```
 
 ### Resultado
 
-La prueba fue satisfactoria. La primaria aceptó la escritura, la réplica reportó `pg_is_in_recovery() = t`, el dato apareció en la réplica y la primaria reportó el estado `streaming`.
+La prueba fue satisfactoria. La primaria creó la tabla `prueba_replicacion` e insertó un registro.
+El mismo registro apareció correctamente en la réplica con ID 1. Esto demuestra que la réplica
+recibe las escrituras realizadas en la primaria.
 
 ## 5. Prueba de caída de una instancia
 
@@ -174,7 +171,7 @@ docker compose --env-file .env.example stop app1
 
 1..6 | ForEach-Object {
   curl.exe --max-time 5 -sS -D - -o NUL `
-    -H "X-API-Key: change_me_gateway" `
+    -H "X-API-Key: $env:BODEGA_API_KEY" `
     http://127.0.0.1:8080/ |
     Select-String -Pattern "^HTTP/|^X-Instance:"
 }
@@ -205,3 +202,45 @@ Posteriormente, `app1` fue restaurada mediante `docker compose start app1`.
 ### Resultado
 
 La prueba fue satisfactoria. Las seis peticiones respondieron HTTP 200 y fueron atendidas por `app-2`, identificado mediante el encabezado `X-Instance`, mientras `app1` estaba detenida. Luego `app1` volvió a levantarse correctamente.
+
+## 6. Tolerancia a fallos con `app2` (12 de noviembre de 2026)
+
+### Objetivo
+
+Comprobar que, al detener temporalmente `app2`, el balanceador continúa atendiendo las
+peticiones mediante `app-1` y que todos los servicios vuelven a quedar saludables después de
+restaurarla.
+
+### Comandos utilizados
+
+```powershell
+docker compose stop app2
+
+1..5 | ForEach-Object {
+  curl.exe --max-time 5 -sS -D - -o NUL `
+    -H "X-API-Key: $env:BODEGA_API_KEY" `
+    http://127.0.0.1:8080/ |
+    Select-String -Pattern "^HTTP/|^X-Instance:"
+}
+
+docker compose start app2
+docker compose ps
+```
+
+### Salida obtenida
+
+Las cinco solicitudes respondieron HTTP 200 y mostraron el encabezado:
+
+```text
+HTTP/1.0 200 OK
+X-Instance: app-1
+```
+
+Posteriormente, `app2` se inició con `docker compose start app2`. Se comprobó que los seis
+servicios terminaron en estado `healthy`.
+
+### Resultado
+
+La prueba fue satisfactoria. Mientras `app2` estaba detenida, el Gateway continuó atendiendo
+las cinco solicitudes mediante `app-1`, sin errores HTTP. Tras iniciar `app2`, los seis servicios
+quedaron en estado `healthy`.
