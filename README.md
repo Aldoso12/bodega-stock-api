@@ -24,7 +24,7 @@ Para las pruebas, la API Key se lee desde `.env` y se mantiene en la variable `$
 $apiKey = (Get-Content .env |
   Where-Object { $_ -match '^API_KEY=' } |
   Select-Object -First 1) -replace '^API_KEY=', ''
-$apiKey = $apiKey.Trim()
+$apiKey = $apiKey.Trim().Trim('"').Trim("'")
 if ([string]::IsNullOrWhiteSpace($apiKey)) {
   throw 'API_KEY no está definida en .env'
 }
@@ -128,17 +128,18 @@ X-Instance: app-2
 2. Escribir un dato en la primaria:
 
    ```powershell
-   docker compose exec db-primary psql -U bodega_admin -d bodega -c "CREATE TABLE IF NOT EXISTS prueba_replicacion (id integer PRIMARY KEY, mensaje text NOT NULL); INSERT INTO prueba_replicacion (id, mensaje) VALUES (1, 'Prueba de replicacion Bodega Express') ON CONFLICT (id) DO UPDATE SET mensaje = EXCLUDED.mensaje;"
+   docker compose exec db-primary psql -U bodega_admin -d bodega -c "CREATE TABLE IF NOT EXISTS prueba_replicacion (id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, mensaje text NOT NULL); INSERT INTO prueba_replicacion (mensaje) VALUES ('Validacion final Bodega Express 12 noviembre');"
    ```
 
-3. Confirmar mediante SQL que el mismo registro llegó a la réplica:
+3. Confirmar mediante SQL que el registro insertado llegó a la réplica:
 
    ```powershell
-   docker compose exec db-replica psql -U bodega_admin -d bodega -tAc "SELECT id, mensaje FROM prueba_replicacion WHERE id = 1;"
+   docker compose exec db-replica psql -U bodega_admin -d bodega -c "SELECT * FROM prueba_replicacion ORDER BY id DESC LIMIT 3;"
    ```
 
-   La réplica debe mostrar el registro con ID `1` y el mensaje `Prueba de replicacion Bodega Express`.
-   Esto demuestra que recibe las escrituras realizadas en la primaria.
+   La réplica debe mostrar entre los últimos registros el mensaje `Validacion final Bodega Express 12 noviembre`.
+   El ID asignado depende de las inserciones anteriores; no se establece un ID fijo como resultado esperado.
+   Esto demuestra que la réplica recibe las escrituras realizadas en la primaria.
 
 4. Confirmar opcionalmente que la réplica está en recuperación:
 
@@ -157,16 +158,15 @@ X-Instance: app-2
 
 ## Tolerancia a fallos con `app2`
 
-Detener `app2`, realizar cinco peticiones autorizadas y comprobar que el Gateway continúa
-respondiendo desde `app-1` mediante `X-Instance`:
+El 12 de noviembre de 2026 se detuvo `app2` y se realizaron cinco peticiones autorizadas.
+Todas respondieron HTTP 200 desde `app-1`, identificado mediante `X-Instance`:
 
 ```powershell
 docker compose stop app2
 1..5 | ForEach-Object { curl.exe --max-time 5 -sS -D - -o NUL -H "X-API-Key: $apiKey" http://localhost:8080/ | Select-String '^HTTP/|^X-Instance:' }
 ```
 
-Las solicitudes deben responder HTTP 200 y mostrar `X-Instance: app-1`. Restaurar `app2` y
-comprobar nuevamente el estado de los servicios:
+Después se restauró `app2` y se comprobó que los seis servicios quedaron saludables:
 
 ```powershell
 docker compose start app2

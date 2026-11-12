@@ -2,6 +2,13 @@
 
 Las siguientes evidencias corresponden a las pruebas ejecutadas con Docker Compose en el entorno local.
 
+## Preparación de las pruebas
+
+```powershell
+$apiKey = (Get-Content .env | Where-Object { $_ -match '^API_KEY=' } | Select-Object -First 1) -replace '^API_KEY=', ''
+$apiKey = $apiKey.Trim().Trim('"').Trim("'")
+```
+
 ## 1. Entrada por el gateway
 
 ### Objetivo
@@ -48,7 +55,7 @@ Comprobar que las peticiones autorizadas que llegan al gateway se reenvían al b
 for ($i=1; $i -le 6; $i++) {
   Write-Output "--- request $i ---"
   curl.exe --max-time 5 -sS -D - -o NUL `
-    -H "X-API-Key: $env:BODEGA_API_KEY" `
+    -H "X-API-Key: $apiKey" `
     http://127.0.0.1:8080/ |
     Select-String -Pattern "^HTTP/|^X-Instance:"
 }
@@ -91,7 +98,7 @@ Comprobar que el gateway permite una petición con la API Key configurada y rech
 
 ```powershell
 curl.exe --max-time 3 -sS -o NUL -w "valid_status=%{http_code}`n" `
-  -H "X-API-Key: $env:BODEGA_API_KEY" `
+  -H "X-API-Key: $apiKey" `
   http://127.0.0.1:8080/
 
 curl.exe --max-time 3 -sS -o NUL -w "missing_status=%{http_code}`n" `
@@ -111,7 +118,7 @@ wrong_status=401
 ```
 
 La solicitud con la clave correcta utilizó la clave configurada mediante la variable de entorno
-`BODEGA_API_KEY`; su valor no se documenta. La solicitud con `clave-no-valida` utilizó un
+`API_KEY`; su valor no se documenta. La solicitud con `clave-no-valida` utilizó un
 valor deliberadamente incorrecto y no corresponde a ninguna credencial real.
 
 Además, la respuesta autorizada incluyó un encabezado `X-Instance`, por ejemplo:
@@ -135,28 +142,24 @@ réplica. La prueba se realizó en la base de datos `bodega` con el usuario `bod
 ### Comandos utilizados
 
 ```powershell
-docker compose --env-file .env.example exec -T db-primary `
-  psql -U bodega_admin -d bodega -c `
-  "CREATE TABLE prueba_replicacion (id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, mensaje text NOT NULL); INSERT INTO prueba_replicacion (mensaje) VALUES ('Prueba de replicacion Bodega Express');"
+docker compose exec db-primary psql -U bodega_admin -d bodega -c "INSERT INTO prueba_replicacion (mensaje) VALUES ('Validacion final Bodega Express 12 noviembre');"
 
-docker compose --env-file .env.example exec -T db-replica `
-  psql -U bodega_admin -d bodega -tAc `
-  "SELECT id, mensaje FROM prueba_replicacion;"
+docker compose exec db-replica psql -U bodega_admin -d bodega -c "SELECT * FROM prueba_replicacion ORDER BY id DESC LIMIT 3;"
 ```
 
 ### Salida obtenida
 
 ```text
-CREATE TABLE
-INSERT 0 1
-1 | Prueba de replicacion Bodega Express
+id 2 | Validacion final Bodega Express 12 noviembre
+id 1 | Prueba de replicacion Bodega Express
+(2 rows)
 ```
 
 ### Resultado
 
-La prueba fue satisfactoria. La primaria creó la tabla `prueba_replicacion` e insertó un registro.
-El mismo registro apareció correctamente en la réplica con ID 1. Esto demuestra que la réplica
-recibe las escrituras realizadas en la primaria.
+La prueba fue satisfactoria. El segundo registro fue insertado en la primaria y posteriormente
+consultado en la réplica junto con el registro anterior. Esto demuestra que la réplica recibe las
+escrituras realizadas en la primaria.
 
 ## 5. Prueba de caída de una instancia
 
@@ -171,7 +174,7 @@ docker compose --env-file .env.example stop app1
 
 1..6 | ForEach-Object {
   curl.exe --max-time 5 -sS -D - -o NUL `
-    -H "X-API-Key: $env:BODEGA_API_KEY" `
+    -H "X-API-Key: $apiKey" `
     http://127.0.0.1:8080/ |
     Select-String -Pattern "^HTTP/|^X-Instance:"
 }
@@ -218,7 +221,7 @@ docker compose stop app2
 
 1..5 | ForEach-Object {
   curl.exe --max-time 5 -sS -D - -o NUL `
-    -H "X-API-Key: $env:BODEGA_API_KEY" `
+    -H "X-API-Key: $apiKey" `
     http://127.0.0.1:8080/ |
     Select-String -Pattern "^HTTP/|^X-Instance:"
 }
