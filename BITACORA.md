@@ -24,3 +24,9 @@
 - **Qué hice hoy:** Verificación del funcionamiento de la arquitectura distribuida de Bodega Express, realizando pruebas del Gateway, autenticación mediante API Key, balanceo entre dos instancias y replicación de PostgreSQL.
 - **Pruebas realizadas:** Se comprobó la continuidad del servicio al detener y reiniciar ambas instancias de aplicación.
 - **Documentación:** Actualización del README y de las evidencias de la Fase 2.
+
+## Viernes 13 de Noviembre de 2026
+- **Qué hice hoy:** Entrega de la Fase 2, incluyendo la arquitectura completa en Docker Compose, la validación del Gateway y la API Key, el balanceador con dos instancias, la replicación de PostgreSQL y la documentación de evidencias.
+- **Dónde me trabé:** No hubo bloqueos técnicos importantes durante la validación final.
+- **Qué haré la próxima clase:** Comenzar la implementación de la aplicación real en las instancias, incorporando las operaciones de escritura en la base primaria y lectura desde la réplica.
+- **Uso de IA:** Se utilizó IA para revisar la documentación y apoyar la validación. Las decisiones y comprobaciones finales fueron revisadas.
