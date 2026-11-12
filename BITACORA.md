@@ -19,3 +19,8 @@
 ## Miércoles 11 de Noviembre de 2026
 - **Qué hice hoy:** Cierre y entrega de la Fase 1, con la finalización de `docs/fase1/REQUISITOS.md` —incluyendo la estimación de carga y almacenamiento— y la creación y revisión de `docs/fase1/DISENO.md`.
 - **Archivos y organización:** Se revisaron los diagramas lógico y físico en PNG y Draw.io, se creó `PRESENTACION BODEGA EXPRESS.pptx` y se prepararon los entregables de la Fase 1 para su publicación en GitHub.
+
+## Jueves 12 de Noviembre de 2026
+- **Qué hice hoy:** Verificación del funcionamiento de la arquitectura distribuida de Bodega Express, realizando pruebas del Gateway, autenticación mediante API Key, balanceo entre dos instancias y replicación de PostgreSQL.
+- **Pruebas realizadas:** Se comprobó la continuidad del servicio al detener y reiniciar ambas instancias de aplicación.
+- **Documentación:** Actualización del README y de las evidencias de la Fase 2.
