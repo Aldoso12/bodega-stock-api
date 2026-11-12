@@ -64,9 +64,40 @@ Al quinto año se proyectan aproximadamente:
 - 3.421 solicitudes totales por día.
 - Una relación aproximada de 10:1 entre lecturas y escrituras.
 
-Considerando una concentración de solicitudes en horarios de mayor actividad, se establece como objetivo inicial soportar al menos 5 solicitudes por segundo y 20 usuarios concurrentes.
+Considerando una jornada de 8 horas (28.800 segundos), el promedio de solicitudes por segundo sería:
 
-### 4.3 Justificación de la arquitectura
+| Tipo de solicitud | Solicitudes diarias | Solicitudes por segundo |
+|---|---:|---:|
+| GET | 3.110 | 0,108 |
+| POST | 311 | 0,011 |
+| **Total** | **3.421** | **0,119** |
+
+### 4.3 Solicitudes en hora punta
+
+Se supone que el 30% del tráfico diario se concentra en una hora:
+
+| Tipo de solicitud | Solicitudes en una hora | Solicitudes por segundo |
+|---|---:|---:|
+| GET | 933 | 0,259 |
+| POST | 93 | 0,026 |
+| **Total** | **1.026** | **0,285** |
+
+Además, se consideran ráfagas de hasta cinco veces el tráfico de hora punta, equivalentes aproximadamente a 1,43 solicitudes por segundo. Por lo tanto, se mantiene como objetivo de capacidad soportar al menos 5 solicitudes por segundo y 20 usuarios concurrentes.
+
+### 4.4 Estimación de almacenamiento a cinco años
+
+Considerando aproximadamente 3 KB por producto, 1 KB por movimiento de inventario, la conservación de los movimientos durante cinco años y un 30% adicional por índices y estructura de la base de datos, se estima:
+
+| Concepto | Cantidad | Almacenamiento aproximado |
+|---|---:|---:|
+| Productos | 6.802 | 20 MB |
+| Movimientos de inventario | 407.340 | 398 MB |
+| Índices y estructura adicional | — | 125 MB |
+| **Total estimado** | — | **543 MB** |
+
+Se recomienda reservar una capacidad de 1,1 GB. Estos valores son estimaciones académicas y no mediciones reales.
+
+### 4.5 Justificación de la arquitectura
 
 Se utilizará una base de datos primaria para registrar las modificaciones del inventario y una réplica destinada a responder las consultas.
 
