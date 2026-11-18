@@ -30,3 +30,9 @@
 - **Dónde me trabé:** No hubo bloqueos técnicos importantes durante la validación final.
 - **Qué haré la próxima clase:** Comenzar la implementación de la aplicación real en las instancias, incorporando las operaciones de escritura en la base primaria y lectura desde la réplica.
 - **Uso de IA:** Se utilizó IA para revisar la documentación y apoyar la validación. Las decisiones y comprobaciones finales fueron revisadas.
+## Miércoles 18 de Noviembre de 2026
+- **Qué hice hoy:** Integración de la aplicación Bodega Express con PostgreSQL, configurando las operaciones de escritura en la base primaria y lectura desde la réplica. También se completó la configuración del Gateway con API Key y Rate Limiting.
+- **Pruebas realizadas:** Se verificó la autenticación, el balanceo entre las dos instancias, la escritura y lectura de productos, el límite de solicitudes y el rechazo de métodos y cuerpos HTTP no permitidos.
+- **Documentación:** Actualización y revisión del README, elaboración de `docs/fase3/EVIDENCIAS.md` y preparación de seis capturas de las pruebas realizadas.
+- **Uso de IA:** Se utilizó IA como apoyo en la implementación, revisión del código y documentación. Las pruebas y resultados fueron comprobados en el entorno local.
+- **Qué haré la próxima clase:** Realizar pruebas de tolerancia a fallos de las bases de datos, promoción de la réplica y medición de RPO/RTO.

@@ -64,9 +64,16 @@ services:
       context: ./app
     container_name: bodega-app-1
     environment:
-      INSTANCE_NAME: app-1
+      INSTANCE_ID: app-1
+      DB_PRIMARY_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}
+      DB_REPLICA_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-replica:5432/${POSTGRES_DB}
     expose:
       - "8000"
+    depends_on:
+      db-primary:
+        condition: service_healthy
+      db-replica:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
       interval: 5s
@@ -81,9 +88,16 @@ services:
       context: ./app
     container_name: bodega-app-2
     environment:
-      INSTANCE_NAME: app-2
+      INSTANCE_ID: app-2
+      DB_PRIMARY_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}
+      DB_REPLICA_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-replica:5432/${POSTGRES_DB}
     expose:
       - "8000"
+    depends_on:
+      db-primary:
+        condition: service_healthy
+      db-replica:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
       interval: 5s
@@ -119,6 +133,10 @@ services:
     environment:
       API_KEY: ${API_KEY:?API_KEY is required}
       BALANCER_URL: http://load-balancer
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-60}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      GATEWAY_MAX_BODY_BYTES: ${GATEWAY_MAX_BODY_BYTES:-1048576}
+      GATEWAY_UPSTREAM_TIMEOUT_SECONDS: ${GATEWAY_UPSTREAM_TIMEOUT_SECONDS:-8}
     ports:
       - "8080:8080"
     depends_on:
