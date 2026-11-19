@@ -30,9 +30,14 @@
 - **Dónde me trabé:** No hubo bloqueos técnicos importantes durante la validación final.
 - **Qué haré la próxima clase:** Comenzar la implementación de la aplicación real en las instancias, incorporando las operaciones de escritura en la base primaria y lectura desde la réplica.
 - **Uso de IA:** Se utilizó IA para revisar la documentación y apoyar la validación. Las decisiones y comprobaciones finales fueron revisadas.
+
 ## Miércoles 18 de Noviembre de 2026
 - **Qué hice hoy:** Integración de la aplicación Bodega Express con PostgreSQL, configurando las operaciones de escritura en la base primaria y lectura desde la réplica. También se completó la configuración del Gateway con API Key y Rate Limiting.
 - **Pruebas realizadas:** Se verificó la autenticación, el balanceo entre las dos instancias, la escritura y lectura de productos, el límite de solicitudes y el rechazo de métodos y cuerpos HTTP no permitidos.
-- **Documentación:** Actualización y revisión del README, elaboración de `docs/fase3/EVIDENCIAS.md` y preparación de seis capturas de las pruebas realizadas.
+- **Failover realizado:** A las `18:10:38.0610504 -03:00` inició la interrupción controlada. La sincronización previa mostró `0 bytes` pendientes. `db-primary` fue detenido a las `18:13:24.2667926 -03:00`; la promoción de `db-replica` inició a las `18:14:31.4471380 -03:00` y se completó correctamente con timeline 2 y `pg_is_in_recovery=false`. No se realizaron escrituras de prueba.
+- **Recuperación del servicio:** app1, app2 y Gateway quedaron saludables y se verificó un GET autenticado con HTTP 200. La recuperación confirmada del Gateway ocurrió a las `18:15:54 -03:00`; desde el inicio de la interrupción correspondió a aproximadamente `315.94 segundos` o `5 minutos 16 segundos`.
+- **Reincorporación:** Se corrigió la autenticación de `bodega_replicator`, se conservó `standby.signal` y se confirmó `.pgpass` con permisos 600. `db-primary` quedó en recovery como réplica de `db-replica`, con `pg_stat_wal_receiver` y `pg_stat_replication` en `streaming`. Ambos nodos observaron la posición WAL `0/30CA8D0`, y todos los registros de `productos` y `movimientos` coincidieron.
+- **RPO observado:** La diferencia WAL previa fue `0 bytes`; este resultado no garantiza pérdida cero ante cualquier incidente futuro.
+- **Documentación:** Actualización y revisión del README y elaboración de `docs/fase3/EVIDENCIAS.md` y `docs/fase3/PRUEBAS_DE_FALLA.md` con los resultados reales de la prueba.
 - **Uso de IA:** Se utilizó IA como apoyo en la implementación, revisión del código y documentación. Las pruebas y resultados fueron comprobados en el entorno local.
-- **Qué haré la próxima clase:** Realizar pruebas de tolerancia a fallos de las bases de datos, promoción de la réplica y medición de RPO/RTO.
+- **Qué haré la próxima clase:** Conservar la topología final, revisar las evidencias documentadas y preparar la entrega sin realizar nuevas pruebas ni modificar la configuración.

@@ -14,6 +14,8 @@ services:
       - -c
       - wal_level=replica
       - -c
+      - wal_log_hints=on
+      - -c
       - max_wal_senders=10
       - -c
       - max_replication_slots=10
@@ -43,7 +45,7 @@ services:
       REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:?REPLICATION_PASSWORD is required}
       PRIMARY_HOST: db-primary
     entrypoint: ["bash", "/usr/local/bin/replica-entrypoint.sh"]
-    command: ["postgres"]
+    command: ["postgres", "-c", "wal_log_hints=on"]
     volumes:
       - db_replica_data:/var/lib/postgresql/data
       - ./scripts/replica/replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
@@ -51,7 +53,7 @@ services:
       db-primary:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\" && psql -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\" -tAc \"SELECT pg_is_in_recovery()\" | grep -q t"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -65,8 +67,8 @@ services:
     container_name: bodega-app-1
     environment:
       INSTANCE_ID: app-1
-      DB_PRIMARY_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}
-      DB_REPLICA_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-replica:5432/${POSTGRES_DB}
+      DB_PRIMARY_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_PRIMARY_HOST:-db-primary}:5432/${POSTGRES_DB}
+      DB_REPLICA_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_REPLICA_HOST:-db-replica}:5432/${POSTGRES_DB}
     expose:
       - "8000"
     depends_on:
@@ -89,8 +91,8 @@ services:
     container_name: bodega-app-2
     environment:
       INSTANCE_ID: app-2
-      DB_PRIMARY_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}
-      DB_REPLICA_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-replica:5432/${POSTGRES_DB}
+      DB_PRIMARY_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_PRIMARY_HOST:-db-primary}:5432/${POSTGRES_DB}
+      DB_REPLICA_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_REPLICA_HOST:-db-replica}:5432/${POSTGRES_DB}
     expose:
       - "8000"
     depends_on:

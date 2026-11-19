@@ -50,7 +50,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-El comando construye las imágenes y levanta `db-primary`, `db-replica`, `app1`, `app2`, `load-balancer` y `gateway`. Las bases utilizan volúmenes separados. La réplica espera que la primaria esté saludable, ejecuta `pg_basebackup` en su primer inicio y luego arranca PostgreSQL en modo recuperación. Al iniciar cada aplicación se crean las tablas `productos` y `movimientos` de forma idempotente en la primaria. El gateway es la única entrada publicada en `http://localhost:8080`; Nginx y las aplicaciones solo son accesibles dentro de la red Docker.
+El comando construye las imágenes y levanta `db-primary`, `db-replica`, `app1`, `app2`, `load-balancer` y `gateway`. En la topología inicial, `db-primary` es el primario y `db-replica` es el standby. Las bases utilizan volúmenes separados. La réplica espera que la primaria esté saludable, ejecuta `pg_basebackup` en su primer inicio y después arranca PostgreSQL en modo recuperación. Al iniciar cada aplicación se crean las tablas `productos` y `movimientos` de forma idempotente en la primaria. El gateway es la única entrada publicada en `http://localhost:8080`; Nginx y las aplicaciones solo son accesibles dentro de la red Docker.
 
 Si las imágenes ya están construidas y actualizadas, puede utilizarse:
 
@@ -60,7 +60,7 @@ docker compose up -d
 
 ## Aplicación de inventario
 
-Las instancias reciben `DB_PRIMARY_URL`, `DB_REPLICA_URL` e `INSTANCE_ID`. Las escrituras utilizan exclusivamente `db-primary` y las lecturas utilizan exclusivamente `db-replica`. La réplica es asíncrona, por lo que una consulta inmediatamente posterior a una escritura puede tardar en reflejar el cambio.
+Las instancias reciben `DB_PRIMARY_URL`, `DB_REPLICA_URL` e `INSTANCE_ID`. En la topología inicial, las escrituras utilizan `db-primary` y las lecturas utilizan `db-replica`. La réplica es asíncrona, por lo que una consulta inmediatamente posterior a una escritura puede tardar en reflejar el cambio.
 
 Las respuestas incluyen `X-Instance`. Las lecturas incluyen `X-DB: replica` y las escrituras incluyen `X-DB: primary`.
 
@@ -175,13 +175,15 @@ curl.exe --max-time 5 -i http://localhost:8080/productos
 docker compose ps
 ```
 
-Los servicios esperados son `db-primary`, `db-replica`, `app1`, `app2`, `load-balancer` y `gateway`. Los seis deben aparecer activos y saludables.
+Los servicios esperados son `db-primary`, `db-replica`, `app1`, `app2`, `load-balancer` y `gateway`. Durante la validación inicial, antes del failover, los seis estuvieron activos y saludables.
+
+Después de promover `db-replica`, su healthcheck puede mostrar `unhealthy` porque comprueba que `pg_is_in_recovery() = true`, una condición propia de un standby. Esto no significa necesariamente que PostgreSQL no esté disponible: el nodo promovido puede aceptar conexiones como primario. Esta limitación del healthcheck no modifica la topología ni se corrige en Compose.
 
 ## Pruebas de integración de Fase 3
 
-Estas son las pruebas realizadas para validar la integración actual del Gateway y la aplicación real:
+Estas son las pruebas realizadas para validar la integración del Gateway y la aplicación real:
 
-- Los seis servicios estuvieron activos y saludables.
+- Los seis servicios estuvieron activos y saludables durante la validación inicial, antes del failover.
 - GET sin API Key: HTTP 401.
 - GET autenticado: HTTP 200, con lectura desde la réplica.
 - Balanceador: ocho solicitudes distribuidas, cuatro a `app-1` y cuatro a `app-2`.
@@ -190,9 +192,38 @@ Estas son las pruebas realizadas para validar la integración actual del Gateway
 - Rate Limiting: 60 respuestas HTTP 200 y cinco respuestas HTTP 429 en 65 solicitudes.
 - DELETE: HTTP 405 con `Allow: GET, POST`.
 - Cuerpo de 1.048.588 bytes: HTTP 413.
-- Después de las pruebas, los seis servicios continuaron saludables.
+- No se realizaron escrituras de prueba durante el failover controlado.
+- `pg_rewind` informó `no rewind required`.
+- La replicación final quedó en estado `streaming`, con `db-replica` como emisor y `db-primary` como receptor.
+- La posición WAL observada en ambos nodos fue `0/30CA8D0`.
+- Todos los registros de `productos` y `movimientos` coincidieron después de la reincorporación.
 
-No se realizaron durante esta jornada pruebas de caída de la primaria, promoción de la réplica ni mediciones de RPO/RTO.
+El 18 de noviembre de 2026 se ejecutó un failover controlado. La interrupción comenzó a las `18:10:38.0610504 -03:00`; antes de detener la primaria se observó una diferencia WAL de `0 bytes`. Este RPO corresponde únicamente a esta ejecución y no es una garantía universal de pérdida cero.
+
+La promoción de `db-replica` comenzó a las `18:14:31.4471380 -03:00` y finalizó correctamente, pero la hora exacta de finalización no quedó registrada. Durante la recuperación, app1, app2 y Gateway apuntaron temporalmente a `db-replica`.
+
+El RTO confirmado fue de `315.94 segundos` (aproximadamente `5 minutos 16 segundos`), medido desde el inicio de la interrupción hasta una respuesta HTTP `200` del Gateway a las `18:15:54 -03:00`. Este valor representa la recuperación confirmada del Gateway y no una hora independiente de recuperación para cada aplicación.
+
+### Topología final después del failover
+
+```text
+Gateway
+   |
+   v
+load-balancer
+   |
+   v
+app1/app2
+   |
+   v
+db-replica (único primario; pg_is_in_recovery=false)
+          |
+          | streaming WAL asíncrono
+          v
+db-primary (standby; pg_is_in_recovery=true)
+```
+
+La replicación final es unidireccional, desde `db-replica` hacia `db-primary`. `db-primary` fue reincorporado como standby después de recuperar el servicio, y no es una topología bidireccional.
 
 El Gateway es el único servicio publicado al equipo anfitrión. El balanceador no publica puertos al equipo anfitrión y solo es accesible dentro de la red interna de Docker.
 
@@ -225,6 +256,8 @@ X-Instance: app-2
 ```
 
 ## Antecedentes históricos: pruebas SQL de replicación
+
+Estas pruebas corresponden a la topología anterior al failover, con `db-primary` como primaria y `db-replica` como réplica; no describen los roles finales.
 
 1. Comprobar que ambos servicios estén activos:
 
