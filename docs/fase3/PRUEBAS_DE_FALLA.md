@@ -407,7 +407,7 @@ docker compose ps app1 app2 gateway load-balancer db-replica db-primary
 
 El contenedor `db-primary` puede seguir detenido mientras se recuperan las aplicaciones y el Gateway. Su reincorporación como standby y la comprobación de `streaming` son una etapa posterior.
 
-Nota sobre el healthcheck: el healthcheck de `db-replica` comprueba `pg_is_in_recovery() = true`. Por ello puede marcar `db-replica` como `unhealthy` después de la promoción aunque PostgreSQL acepte conexiones y sea el primario válido. Esta es una limitación conocida del healthcheck actual; no se modifica Compose en esta prueba.
+Nota sobre el healthcheck: el healthcheck de `db-replica` comprueba la disponibilidad de PostgreSQL mediante `pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"`. No comprueba el rol del nodo ni su estado de recuperación; el rol debe confirmarse mediante `pg_is_in_recovery()`. No se modifica Compose en esta prueba.
 
 Verificar la configuración efectiva sin mostrar contraseñas:
 
@@ -462,13 +462,16 @@ $rtoFullService = $global:GatewayRecoveryTimestamp - $global:InterruptionStart
 
 Registrar `$global:GatewayRecoveryTimestamp` inmediatamente después de confirmar el HTTP `200` del Gateway. Esta marca es la hora de recuperación del Gateway, no la hora de promoción. No registrar una hora independiente para app1 o app2 si no existe una marca temporal observada.
 
-No se debe inventar ni declarar alcanzado un objetivo RTO sin haber sido definido por el profesor.
+El objetivo RTO definido en Fase 1 debe compararse con el resultado observado y no debe declararse cumplido si el tiempo registrado lo supera.
 
 ### Resultado RTO/RPO observado en esta ejecución
 
-- RPO de sincronización previa: `0 bytes` de diferencia WAL. Este fue el resultado observado durante esta prueba; no constituye una garantía de pérdida cero en cualquier fallo futuro.
+- RPO objetivo de Fase 1: máximo 1 minuto de datos potencialmente perdidos.
+- RPO de sincronización previa: `0 bytes` pendientes de sincronización en el punto comprobado. Este fue el resultado observado durante esta prueba; no constituye una garantía de pérdida cero en cualquier fallo futuro.
+- RTO objetivo de Fase 1: recuperar la capacidad de escritura en un máximo de `300 segundos` (5 minutos).
 - Recuperación efectiva confirmada del Gateway: respuesta HTTP `200` con marca `21:15:54 UTC` en el encabezado de respuesta, equivalente a `18:15:54 -03:00`.
 - RTO desde el inicio de la interrupción `18:10:38.0610504 -03:00` hasta esa respuesta confirmada: `315.94 segundos` (aproximadamente `5 minutos 16 segundos`).
+- El RTO observado supera el objetivo de `300 segundos` por `15.94 segundos`; el objetivo RTO no se cumplió en esta ejecución.
 - La hora exacta de la promoción completada no quedó registrada en los registros disponibles y no se usarán estimaciones para calcular el RTO de promoción.
 - app1 y app2 quedaron confirmadas como `healthy`; sin una marca temporal exacta independiente no se registra una hora distinta para la recuperación de cada aplicación.
 - Este RTO corresponde a la recuperación confirmada del servicio Gateway y no representa una medición exacta de la recuperación interna de cada instancia.
@@ -787,4 +790,4 @@ Completar en el momento real de la autorización y ejecución.
 | Estado final de `db-primary` | Standby activo; `pg_is_in_recovery=true`; receptor `streaming` |
 | Estado final de `db-replica` | Primario activo; `pg_is_in_recovery=false`; emisor `streaming` |
 
-RPO y RTO no tienen objetivos definidos en los datos disponibles. Los valores anteriores son observaciones reales de esta ejecución y no objetivos ni garantías generales.
+Los valores anteriores son observaciones reales de esta ejecución. El RPO observado fue de `0 bytes` pendientes en el punto comprobado y el objetivo RTO no se cumplió en esta ejecución.

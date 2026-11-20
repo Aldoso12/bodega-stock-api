@@ -175,11 +175,12 @@ No existe una hora exacta independiente registrada para la recuperación de cada
 
 ## 11. Resumen de RPO y RTO
 
-- RPO observado: diferencia WAL previa de `0 bytes`.
-- Este resultado corresponde a esta ejecución y no garantiza pérdida cero ante cualquier fallo.
-- RTO confirmado: `315.94 segundos` desde el inicio de la interrupción hasta una respuesta HTTP 200 del Gateway.
+- RPO objetivo de Fase 1: máximo 1 minuto de datos potencialmente perdidos.
+- RPO observado: `0 bytes` pendientes de sincronización en la comprobación previa a la interrupción. Este resultado corresponde a esta ejecución y no garantiza pérdida cero ante cualquier fallo.
+- RTO objetivo de Fase 1: recuperar la capacidad de escritura en un máximo de `300 segundos` (5 minutos).
+- RTO observado: `315.94 segundos` desde el inicio de la interrupción hasta una respuesta HTTP 200 del Gateway.
+- El RTO observado supera el objetivo de `300 segundos` por `15.94 segundos`; el objetivo RTO no se cumplió en esta ejecución.
 - La hora exacta de promoción completada no fue registrada y no se presenta como RTO completo.
-- No se utilizaron objetivos RPO/RTO no documentados por el proyecto.
 
 ## Conclusión
 

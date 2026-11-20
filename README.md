@@ -177,7 +177,7 @@ docker compose ps
 
 Los servicios esperados son `db-primary`, `db-replica`, `app1`, `app2`, `load-balancer` y `gateway`. Durante la validación inicial, antes del failover, los seis estuvieron activos y saludables.
 
-Después de promover `db-replica`, su healthcheck puede mostrar `unhealthy` porque comprueba que `pg_is_in_recovery() = true`, una condición propia de un standby. Esto no significa necesariamente que PostgreSQL no esté disponible: el nodo promovido puede aceptar conexiones como primario. Esta limitación del healthcheck no modifica la topología ni se corrige en Compose.
+Después de promover `db-replica`, su healthcheck comprueba la disponibilidad de PostgreSQL mediante `pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"`. No comprueba el rol del nodo ni su estado de recuperación; el rol debe confirmarse mediante `pg_is_in_recovery()`.
 
 ## Pruebas de integración de Fase 3
 
@@ -202,7 +202,7 @@ El 18 de noviembre de 2026 se ejecutó un failover controlado. La interrupción 
 
 La promoción de `db-replica` comenzó a las `18:14:31.4471380 -03:00` y finalizó correctamente, pero la hora exacta de finalización no quedó registrada. Durante la recuperación, app1, app2 y Gateway apuntaron temporalmente a `db-replica`.
 
-El RTO confirmado fue de `315.94 segundos` (aproximadamente `5 minutos 16 segundos`), medido desde el inicio de la interrupción hasta una respuesta HTTP `200` del Gateway a las `18:15:54 -03:00`. Este valor representa la recuperación confirmada del Gateway y no una hora independiente de recuperación para cada aplicación.
+El RTO confirmado fue de `315.94 segundos` (aproximadamente `5 minutos 16 segundos`), medido desde el inicio de la interrupción hasta una respuesta HTTP `200` del Gateway a las `18:15:54 -03:00`. Este valor representa la recuperación confirmada del Gateway y no una hora independiente de recuperación para cada aplicación. Frente al objetivo de Fase 1 de `300 segundos` (5 minutos), el RTO superó el límite por `15.94 segundos`; el objetivo RTO no se cumplió en esta ejecución.
 
 ### Topología final después del failover
 
@@ -334,6 +334,6 @@ docker compose down -v
 
 El segundo comando es destructivo: elimina los volúmenes persistentes de PostgreSQL y no es necesario para el inicio normal. Úsalo solo cuando sea necesario reinicializar completamente los datos.
 
-La evidencia detallada de las pruebas está en [docs/fase2/EVIDENCIAS.md](docs/fase2/EVIDENCIAS.md).
+La evidencia detallada de Fase 3 está en [docs/fase3/EVIDENCIAS.md](docs/fase3/EVIDENCIAS.md). Como antecedente histórico, también puede consultarse la evidencia de [Fase 2](docs/fase2/EVIDENCIAS.md).
 
 La información de este README se limita a la implementación, configuración, comandos y resultados comprobados del proyecto. No se agregan resultados, comandos, configuraciones ni funcionalidades no verificadas.
