@@ -13,6 +13,20 @@ INSTANCE_ID = os.environ.get("INSTANCE_ID", "unknown")
 PRIMARY_URL = os.environ["DB_PRIMARY_URL"]
 REPLICA_URL = os.environ["DB_REPLICA_URL"]
 
+try:
+    DB_CONNECT_TIMEOUT_SECONDS = int(os.environ.get("DB_CONNECT_TIMEOUT_SECONDS", "3"))
+    if DB_CONNECT_TIMEOUT_SECONDS <= 0:
+        raise ValueError
+except ValueError:
+    raise RuntimeError("DB_CONNECT_TIMEOUT_SECONDS debe ser un entero positivo")
+
+
+def connect_database(url, row_factory=None):
+    options = {"connect_timeout": DB_CONNECT_TIMEOUT_SECONDS}
+    if row_factory is not None:
+        options["row_factory"] = row_factory
+    return psycopg.connect(url, **options)
+
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS productos (
@@ -121,12 +135,12 @@ def read_products(path):
         term = f"%{search}%"
         params.extend([term, term])
     query += " ORDER BY id"
-    with psycopg.connect(REPLICA_URL, row_factory=dict_row) as connection:
+    with connect_database(REPLICA_URL, row_factory=dict_row) as connection:
         return [product_json(row) for row in connection.execute(query, params).fetchall()]
 
 
 def read_product(product_id):
-    with psycopg.connect(REPLICA_URL, row_factory=dict_row) as connection:
+    with connect_database(REPLICA_URL, row_factory=dict_row) as connection:
         row = connection.execute(
             "SELECT id, codigo, nombre, descripcion, precio, stock, activo "
             "FROM productos WHERE id = %s",
@@ -138,7 +152,7 @@ def read_product(product_id):
 
 
 def read_movements():
-    with psycopg.connect(REPLICA_URL, row_factory=dict_row) as connection:
+    with connect_database(REPLICA_URL, row_factory=dict_row) as connection:
         rows = connection.execute(
             "SELECT m.id, m.producto_id, p.codigo, m.tipo, m.cantidad, "
             "m.motivo, m.fecha FROM movimientos m "
@@ -157,7 +171,7 @@ def create_product(payload):
     precio = non_negative_decimal(payload, "precio")
     stock = non_negative_integer(payload, "stock")
     try:
-        with psycopg.connect(PRIMARY_URL, row_factory=dict_row) as connection:
+        with connect_database(PRIMARY_URL, row_factory=dict_row) as connection:
             row = connection.execute(
                 "INSERT INTO productos (codigo, nombre, descripcion, precio, stock) "
                 "VALUES (%s, %s, %s, %s, %s) "
@@ -180,7 +194,7 @@ def create_movement(payload):
         raise APIError(400, "motivo debe ser texto")
 
     try:
-        with psycopg.connect(PRIMARY_URL, row_factory=dict_row) as connection:
+        with connect_database(PRIMARY_URL, row_factory=dict_row) as connection:
             product = connection.execute(
                 "SELECT id, stock FROM productos WHERE id = %s AND activo = TRUE FOR UPDATE",
                 (producto_id,),
@@ -223,6 +237,20 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/health":
             self.send_json(200, {"status": "ok", "instance": INSTANCE_ID})
+            return
+        if path == "/health/db":
+            try:
+                with connect_database(PRIMARY_URL) as connection:
+                    connection.execute("SELECT 1").fetchone()
+                self.send_json(
+                    200,
+                    {"status": "ok", "instance": INSTANCE_ID, "primary": "available"},
+                )
+            except psycopg.OperationalError:
+                self.send_json(
+                    503,
+                    {"status": "unavailable", "instance": INSTANCE_ID, "primary": "unavailable"},
+                )
             return
         try:
             if path == "/":
@@ -284,7 +312,7 @@ def parse_id(raw_id):
 
 
 def initialize_schema():
-    with psycopg.connect(PRIMARY_URL) as connection:
+    with connect_database(PRIMARY_URL) as connection:
         connection.execute(SCHEMA_SQL)
 
 

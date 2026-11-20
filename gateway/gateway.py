@@ -28,7 +28,7 @@ def positive_int_env(name, default):
 if not API_KEY:
     raise RuntimeError("API_KEY must not be empty")
 
-RATE_LIMIT_REQUESTS = positive_int_env("RATE_LIMIT_REQUESTS", 60)
+RATE_LIMIT_REQUESTS = positive_int_env("RATE_LIMIT_REQUESTS", 300)
 RATE_LIMIT_WINDOW_SECONDS = positive_int_env("RATE_LIMIT_WINDOW_SECONDS", 60)
 MAX_BODY_BYTES = positive_int_env("GATEWAY_MAX_BODY_BYTES", 1_048_576)
 UPSTREAM_TIMEOUT_SECONDS = positive_int_env("GATEWAY_UPSTREAM_TIMEOUT_SECONDS", 8)

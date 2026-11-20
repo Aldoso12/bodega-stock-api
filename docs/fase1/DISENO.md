@@ -37,38 +37,42 @@ Se conservan también las versiones editables de los diagramas: [Diagrama-lógic
 
 ## 4. Justificación de los componentes, alternativas y costo
 
-| Componente | Problema que resuelve | Alternativa considerada | Costo |
+| Componente | Problema que resuelve | Qué ocurriría sin él | Costo en latencia, complejidad o recursos |
 |---|---|---|---|
-| Gateway | Centraliza el ingreso de solicitudes, aplica API Key y permite controlar el límite de peticiones. | Permitir el acceso directo a las aplicaciones, reduciendo la centralización de estos controles. | No informado en los archivos revisados; pendiente de estimación. |
-| Balanceador de carga | Distribuye las solicitudes entre las dos instancias de aplicación y evita depender de una sola instancia. | Mantener una sola instancia, con menor complejidad pero sin la tolerancia requerida ante su falla. | No informado en los archivos revisados; pendiente de estimación. |
-| Dos instancias de aplicación | Permiten continuar respondiendo si una instancia deja de funcionar y distribuir las consultas simultáneas. | Una única instancia de aplicación. | No informado en los archivos revisados; pendiente de estimación. |
-| Base de datos primaria | Registra los productos y las modificaciones del inventario, incluyendo entradas y salidas. | Usar una única base sin réplica, con menor complejidad pero sin separar lecturas y escrituras. | No informado en los archivos revisados; pendiente de estimación. |
-| Base de datos réplica | Atiende las consultas de productos y stock, evitando que las lecturas interfieran directamente con las escrituras. | Ejecutar las lecturas en la primaria, con menor infraestructura pero mayor concentración de carga. | No informado en los archivos revisados; pendiente de estimación. |
-| Replicación primaria-réplica | Mantiene una copia para las consultas y apoya la continuidad ante problemas de la primaria, considerando que puede existir retraso de replicación. | No utilizar réplica, reduciendo componentes pero perdiendo la separación de cargas. | No informado en los archivos revisados; pendiente de estimación. |
-| Docker Compose y contenedores | Representan la distribución física de los componentes dentro de un servidor y una red interna Docker. | Ejecutar los componentes directamente en el servidor, sin la organización en contenedores mostrada en el diseño físico. | No informado en los archivos revisados; pendiente de estimación. |
+| Gateway | Centraliza el acceso externo, aplica API Key y limita la cantidad de solicitudes. | Las aplicaciones quedarían expuestas individualmente y no existiría un único control centralizado de autenticación y límite de peticiones. | Añade una redirección HTTP y procesamiento por solicitud. Aumenta ligeramente la latencia y exige ejecutar otro contenedor. |
+| Balanceador de carga | Distribuye las solicitudes entre `app1` y `app2` y permite continuar atendiendo cuando una instancia queda fuera de servicio. | Las solicitudes dependerían de una instancia específica o habría que administrar manualmente qué aplicación recibe cada solicitud. | Añade un contenedor Nginx, configuración de upstream y reintentos. Puede agregar latencia y requiere definir el comportamiento ante instancias no disponibles. |
+| Dos instancias de aplicación | Permiten distribuir solicitudes y continuar respondiendo si una instancia deja de funcionar. | Una única instancia concentraría la carga y sería un único punto de falla aplicativo. | Requiere dos contenedores, balanceo y mayor coordinación. Docker Compose mantiene ambos servicios y sus healthchecks. |
+| Base de datos primaria PostgreSQL 16 | Registra productos, movimientos y demás escrituras del inventario. | Las modificaciones quedarían concentradas sin una instancia definida para aceptar escrituras después de una promoción. | Agrega un contenedor y un volumen persistente. Una sola base de escritura aumenta la concentración de carga y constituye un componente crítico. |
+| Base de datos réplica PostgreSQL 16 | Atiende las consultas de productos y stock separadas de las operaciones de escritura. | Las lecturas competirían directamente con las escrituras en la primaria y no habría una réplica física para distribuir consultas. | Agrega otro contenedor, volumen persistente y tráfico WAL. Introduce posible retraso de replicación y datos temporalmente desactualizados. |
+| Replicación streaming primaria-réplica | Mantiene sincronizada la réplica y permite su promoción si falla la primaria. | No existiría una copia física disponible para lecturas ni un procedimiento basado en cambio de roles para continuar con las escrituras. | Agrega tráfico WAL continuo, administración de roles, credenciales de replicación y operación de failover. La replicación asíncrona puede presentar cambios pendientes. |
+| Docker Compose y contenedores | Organiza los seis servicios, sus dependencias, redes internas y volúmenes dentro de un entorno reproducible. | Los componentes tendrían que iniciarse y configurarse de forma independiente, con mayor riesgo de incompatibilidad entre puertos y nombres de red. | Agrega archivos de despliegue y administración de contenedores. Facilita reconstrucción y sustitución de servicios, pero mantiene el servidor físico como recurso compartido. |
 
-La tecnología de base de datos inicialmente considerada es SQL Server. La alternativa tecnológica concreta es PostgreSQL 16 con replicación, porque es la exigida por la pauta. La autorización de SQL Server está pendiente de confirmación con la profesora, por lo que la decisión definitiva debe tomarse después de esa confirmación. No se asigna un costo a ninguna alternativa porque el repositorio no contiene precios ni información de licenciamiento.
+La base de datos definida para la implementación actual es PostgreSQL 16. La arquitectura utiliza una base primaria y una réplica física mediante streaming replication asíncrona. Esta decisión permite separar escrituras y lecturas y conservar una segunda copia de los datos. Su complejidad incluye administrar roles, WAL, recuperación y promoción. No se dispone en los documentos revisados de un costo monetario, tamaño de instancia ni medición comparativa de latencia entre PostgreSQL y una tecnología alternativa; por ello, no se asignan esas cifras ni se considera SQL Server como la tecnología actual.
+
+Los objetivos de recuperación definidos en Fase 1 son un RPO máximo de 1 minuto de datos potencialmente perdidos y un RTO máximo de 300 segundos para recuperar la capacidad de escritura. En el failover ejecutado se observó un RPO de 0 bytes pendientes en el punto comprobado y un RTO de 315,94 segundos hasta una respuesta HTTP 200 confirmada del Gateway, por lo que se superó el objetivo RTO por 15,94 segundos. El RPO observado corresponde a esa ejecución y no garantiza pérdida cero ante cualquier fallo futuro.
+
+En la topología final documentada, `db-replica` es la primaria actual y `db-primary` es la réplica actual. Las aplicaciones deben escribir en la primaria actual y leer desde la réplica actual.
 
 ## 5. Riesgos y mitigaciones
 
 ### Riesgo 1: puntos únicos de falla en la infraestructura física
 
-El diagrama físico identifica el servidor físico, el gateway, el balanceador y la base primaria como puntos únicos de falla.
+El diagrama físico identifica el servidor físico, el gateway, el balanceador y las bases de datos como elementos cuya indisponibilidad puede afectar el servicio.
 
-**Mitigación:** probar la continuidad ante la caída de una instancia de aplicación y evaluar posteriormente medidas para reducir los puntos únicos de falla identificados. La disponibilidad final de redundancia adicional queda pendiente de definición.
+**Mitigación:** mantener dos instancias de aplicación, validar la continuidad ante la caída de una de ellas y conservar la separación primaria-réplica mediante streaming replication. Para reducir otros puntos únicos de falla se requeriría redundancia de infraestructura adicional, cuya implementación no está documentada.
 
 ### Riesgo 2: retraso de replicación
 
-La réplica podría entregar información desactualizada durante una falla o una interrupción de comunicación.
+La réplica podría entregar información desactualizada durante una interrupción de comunicación o una pausa de reproducción WAL.
 
-**Mitigación:** medir el comportamiento de la replicación y considerar este retraso al dirigir las consultas. La réplica por sí sola no garantiza una recuperación automática: para recuperar el servicio de escritura se requiere un mecanismo de promoción o failover de la réplica, cuya implementación queda pendiente de definición. Los valores definitivos deben comprobarse mediante los experimentos de la fase 3.
+**Mitigación:** considerar el carácter asíncrono de la replicación al diseñar lecturas posteriores a escrituras y monitorear el estado de streaming y los bytes pendientes. El proyecto comprobó un retraso controlado mediante una pausa de WAL: la aplicación devolvió HTTP 404 para un registro no reproducido y HTTP 200 después de reanudar la réplica. No implementa fallback automático de lectura a la primaria ni reintentos para datos desactualizados.
 
-### Riesgo 3: elección de tecnología de base de datos no confirmada
+### Riesgo 3: failover y cambio incorrecto de roles
 
-La solución inicialmente considera SQL Server, pero la pauta exige PostgreSQL 16 con replicación y la autorización de la tecnología aún está pendiente.
+Una promoción incorrecta, una configuración desactualizada en las aplicaciones o el mantenimiento simultáneo de dos primarios puede provocar escrituras divergentes o pérdida de continuidad.
 
-**Mitigación:** confirmar la tecnología con la profesora antes de cerrar la implementación y validar que la alternativa aprobada soporte la replicación y la separación entre lecturas y escrituras requeridas.
+**Mitigación:** confirmar `pg_is_in_recovery()` antes y después de la promoción, detener las rutas de escritura durante la ventana controlada, recrear app1 y app2 con los destinos de la topología final y verificar `streaming` en el receptor y el emisor antes de declarar la recuperación. El failover ejecutado promovió `db-replica`, reincorporó `db-primary` como standby y confirmó la replicación final; el procedimiento y sus resultados están registrados en la documentación de Fase 3.
 
 ## 6. Referencia a la presentación PowerPoint de la entrega
 
-La presentación PowerPoint de la entrega deberá referenciar este diseño, los requisitos y los diagramas lógico y físico. El archivo o enlace de la presentación no está incluido en los archivos revisados, por lo que su referencia concreta queda pendiente de incorporación.
+La presentación [PRESENTACION BODEGA EXPRESS.pptx](./PRESENTACION%20BODEGA%20EXPRESS.pptx) se incluye en la entrega de Fase 1 y debe presentar este diseño, los requisitos y los diagramas lógico y físico de forma coherente con la arquitectura documentada.

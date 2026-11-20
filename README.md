@@ -10,13 +10,20 @@ Bodega Express dispone de una aplicación real de inventario conectada a Postgre
 
 ## Configuración del entorno
 
-Crear el archivo `.env` copiando `.env.example`:
+Crear `.env` a partir de `.env.example` solo si todavía no existe. Si `.env` ya existe,
+el comando no debe sobrescribirlo:
 
 ```powershell
-Copy-Item .env.example .env
+if (-not (Test-Path -LiteralPath '.env')) {
+    Copy-Item -LiteralPath '.env.example' -Destination '.env'
+}
 ```
 
 El archivo `.env` contiene las variables necesarias para levantar la arquitectura y está excluido de Git mediante `.gitignore`. No se deben mostrar ni versionar contraseñas o API Keys reales.
+Conservar siempre un `.env` local existente sin modificarlo ni reemplazarlo. `.env.example`
+representa la topología inicial, con `db-primary` como primaria y `db-replica` como réplica.
+Después del failover, la configuración local actual puede apuntar a roles distintos y no debe
+asumirse que sea idéntica a la plantilla.
 
 La configuración del Gateway incluye estos valores predeterminados:
 
@@ -50,7 +57,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-El comando construye las imágenes y levanta `db-primary`, `db-replica`, `app1`, `app2`, `load-balancer` y `gateway`. En la topología inicial, `db-primary` es el primario y `db-replica` es el standby. Las bases utilizan volúmenes separados. La réplica espera que la primaria esté saludable, ejecuta `pg_basebackup` en su primer inicio y después arranca PostgreSQL en modo recuperación. Al iniciar cada aplicación se crean las tablas `productos` y `movimientos` de forma idempotente en la primaria. El gateway es la única entrada publicada en `http://localhost:8080`; Nginx y las aplicaciones solo son accesibles dentro de la red Docker.
+El comando construye las imágenes y levanta `db-primary`, `db-replica`, `app1`, `app2`, `load-balancer` y `gateway`. En la topología inicial, `db-primary` es el primario y `db-replica` es el standby. Esta descripción corresponde al estado inicial definido por `.env.example`; no representa necesariamente los roles finales después de un failover. Las bases utilizan volúmenes separados. La réplica espera que la primaria esté saludable, ejecuta `pg_basebackup` en su primer inicio y después arranca PostgreSQL en modo recuperación. Al iniciar cada aplicación se crean las tablas `productos` y `movimientos` de forma idempotente en la primaria. El gateway es la única entrada publicada en `http://localhost:8080`; Nginx y las aplicaciones solo son accesibles dentro de la red Docker.
 
 Si las imágenes ya están construidas y actualizadas, puede utilizarse:
 
@@ -60,7 +67,7 @@ docker compose up -d
 
 ## Aplicación de inventario
 
-Las instancias reciben `DB_PRIMARY_URL`, `DB_REPLICA_URL` e `INSTANCE_ID`. En la topología inicial, las escrituras utilizan `db-primary` y las lecturas utilizan `db-replica`. La réplica es asíncrona, por lo que una consulta inmediatamente posterior a una escritura puede tardar en reflejar el cambio.
+Las instancias reciben `DB_PRIMARY_URL`, `DB_REPLICA_URL` e `INSTANCE_ID`. En la topología inicial histórica, las escrituras utilizan `db-primary` y las lecturas utilizan `db-replica`. En la topología actual validada después del failover, pueden estar invertidos esos roles. La réplica es asíncrona, por lo que una consulta inmediatamente posterior a una escritura puede tardar en reflejar el cambio.
 
 Las respuestas incluyen `X-Instance`. Las lecturas incluyen `X-DB: replica` y las escrituras incluyen `X-DB: primary`.
 
@@ -179,6 +186,10 @@ Los servicios esperados son `db-primary`, `db-replica`, `app1`, `app2`, `load-ba
 
 Después de promover `db-replica`, su healthcheck comprueba la disponibilidad de PostgreSQL mediante `pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"`. No comprueba el rol del nodo ni su estado de recuperación; el rol debe confirmarse mediante `pg_is_in_recovery()`.
 
+Las aplicaciones mantienen `/health/db`, que abre una conexión a `DB_PRIMARY_URL`, ejecuta
+`SELECT 1` y distingue disponibilidad primaria HTTP `200`/`503`. Este healthcheck no garantiza
+por sí solo que las lecturas desde la réplica estén disponibles.
+
 ## Pruebas de integración de Fase 3
 
 Estas son las pruebas realizadas para validar la integración del Gateway y la aplicación real:
@@ -226,6 +237,26 @@ db-primary (standby; pg_is_in_recovery=true)
 La replicación final es unidireccional, desde `db-replica` hacia `db-primary`. `db-primary` fue reincorporado como standby después de recuperar el servicio, y no es una topología bidireccional.
 
 El Gateway es el único servicio publicado al equipo anfitrión. El balanceador no publica puertos al equipo anfitrión y solo es accesible dentro de la red interna de Docker.
+
+## Validación reciente y documentación de Fase 3
+
+La validación del 20 de noviembre de 2026 confirmó seis contenedores en estado `healthy`, el
+`/health` del Gateway con HTTP `200`, seis solicitudes autenticadas alternadas entre `app-1` y
+`app-2`, y una escritura/lectura del producto ID `39`, código `TEST-20261120-000854`, con
+`X-DB: primary` y `X-DB: replica`, respectivamente.
+
+En la configuración actual validada, app1 y app2 escriben en la primaria actual `db-replica` y
+leen desde la réplica actual `db-primary`. Durante la recuperación del failover histórico ambos
+destinos apuntaron temporalmente a `db-replica`.
+
+La evidencia completa y el procedimiento de failover se encuentran en:
+
+- [Evidencias de Fase 3](docs/fase3/EVIDENCIAS.md)
+- [Pruebas de falla de Fase 3](docs/fase3/PRUEBAS_DE_FALLA.md)
+
+La configuración efectiva posterior al failover utiliza el `.env` local y no se documentan sus
+valores. La plantilla [`.env.example`](.env.example) conserva los destinos de la topología
+inicial y no debe interpretarse como una copia de la configuración actual.
 
 ## Antecedentes históricos: prueba de caída de una instancia
 
@@ -326,13 +357,18 @@ docker compose ps
 docker compose down
 ```
 
-Para eliminar también los datos persistidos y repetir la inicialización desde cero:
+`docker compose down` no es necesario para iniciar ni validar el proyecto y solo debe
+usarse cuando se requiera detener y eliminar los contenedores.
+
+No es necesario usar `docker compose down -v` para iniciar o validar la arquitectura.
+Este comando es especialmente destructivo:
 
 ```powershell
 docker compose down -v
 ```
 
-El segundo comando es destructivo: elimina los volúmenes persistentes de PostgreSQL y no es necesario para el inicio normal. Úsalo solo cuando sea necesario reinicializar completamente los datos.
+`docker compose down -v` elimina los volúmenes y también los datos persistentes de PostgreSQL.
+No debe utilizarse salvo que se autorice expresamente reinicializar por completo las bases de datos.
 
 La evidencia detallada de Fase 3 está en [docs/fase3/EVIDENCIAS.md](docs/fase3/EVIDENCIAS.md). Como antecedente histórico, también puede consultarse la evidencia de [Fase 2](docs/fase2/EVIDENCIAS.md).
 

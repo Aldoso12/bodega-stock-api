@@ -41,3 +41,36 @@
 - **Documentación:** Actualización y revisión del README y elaboración de `docs/fase3/EVIDENCIAS.md` y `docs/fase3/PRUEBAS_DE_FALLA.md` con los resultados reales de la prueba.
 - **Uso de IA:** Se utilizó IA como apoyo en la implementación, revisión del código y documentación. Las pruebas y resultados fueron comprobados en el entorno local.
 - **Qué haré la próxima clase:** Conservar la topología final, revisar las evidencias documentadas y preparar la entrega sin realizar nuevas pruebas ni modificar la configuración.
+
+## Jueves 19 de noviembre de 2026 – Revisión y preparación del avance
+
+- Se revisó el estado del repositorio y los archivos modificados antes de preparar la actualización en GitHub.
+- Se revisaron cambios en `.env.example`, `.gitignore`, `README.md`, `docker-compose.yml` y `docs/fase3/EVIDENCIAS.md`.
+- Se preparó la documentación de `docs/fase3/PRUEBAS_DE_FALLA.md`.
+- Se identificaron archivos locales que debían mantenerse fuera del repositorio, especialmente `_archivo_local/`, y se consideró la protección de credenciales y configuraciones sensibles.
+- Se revisaron los cambios pendientes para evitar publicar archivos innecesarios.
+
+## Viernes 20 de noviembre de 2026 – Validación y mejoras de la Fase 3
+
+- Se revisó la topología posterior al failover y se confirmó que `db-replica` era la primaria actual y `db-primary` funcionaba como réplica.
+- Se validó correctamente `docker compose config --quiet`.
+- Se comprobó que los seis contenedores principales (`app1`, `app2`, `db-primary`, `db-replica`, `gateway` y `load-balancer`) estuvieran en estado `healthy`.
+- El Gateway respondió HTTP 200 en `/health` con el cuerpo `gateway-ok`.
+- Se realizaron seis solicitudes al Gateway; todas devolvieron HTTP 200 y alternaron entre `app-1` y `app-2`.
+- `/health/db` respondió HTTP 200, indicando disponibilidad de la conexión con la primaria.
+- Las cuatro solicitudes a `/health/db` devolvieron HTTP 200.
+- Se consultó el producto ID 39 y respondió HTTP 200 con `X-DB: replica`.
+- Se realizó una escritura mediante `POST /productos`: respondió HTTP 201 con `X-DB: primary` y `X-Instance: app-1`.
+- Se creó el producto ID 42 con código `TEST-20261120-014500`.
+- La lectura posterior de `GET /productos/42` respondió HTTP 200 con `X-DB: replica` y `X-Instance: app-2`; los datos coincidieron con los devueltos por el POST.
+- Esta validación confirma escritura en la primaria y lectura posterior desde la réplica. No constituye un experimento de falla ni mide un tiempo exacto de replicación.
+- Se realizó un experimento de retraso de replicación mediante la pausa de reproducción WAL en `db-primary`. El producto ID 41 fue creado correctamente en la primaria, pero la lectura desde la réplica devolvió HTTP 404 mientras permanecía desactualizada. Después de reanudar la reproducción WAL, la consulta respondió HTTP 200.
+- Se documentaron los resultados, tiempos y limitaciones del experimento, aclarando que se simuló un retraso de replicación y no un corte de red.
+- Se mejoró `app/app.py` incorporando un tiempo de espera configurable para las conexiones PostgreSQL y el endpoint `/health/db`.
+- Se ajustaron los healthchecks de `docker-compose.yml` para comprobar la disponibilidad de la base de datos primaria.
+- Se revisó la configuración de Nginx y se documentaron sus limitaciones de detección pasiva y el tratamiento de respuestas HTTP 503.
+- Se actualizaron `README.md`, `docs/fase3/EVIDENCIAS.md` y `docs/fase3/PRUEBAS_DE_FALLA.md`.
+- Se revisaron los resultados históricos del failover, conservando el RPO observado de 0 bytes pendientes y el RTO de 315,94 segundos.
+- Se ejecutaron validaciones estáticas de Python y `git diff --check`, sin errores.
+
+**Observación:** Los cambios quedaron en el entorno local. No se realizó un nuevo failover ni se registró un nuevo commit o push durante estas actividades.

@@ -81,6 +81,93 @@ No se considera completo el failover hasta que:
   - Todos los registros de `productos` coinciden.
   - Todos los registros de `movimientos` coinciden.
 
+## Validación posterior del 20 de noviembre de 2026
+
+Esta validación es independiente del failover realizado el 18 de noviembre y no modifica sus
+resultados históricos:
+
+- Los seis contenedores principales (`db-primary`, `db-replica`, `app1`, `app2`,
+  `load-balancer` y `gateway`) aparecieron en estado `healthy`.
+- El Gateway respondió HTTP `200` en `/health`.
+- Seis solicitudes autenticadas alternaron correctamente entre `app-1` y `app-2`.
+- La escritura de un producto respondió HTTP `201` con `X-DB: primary`.
+- La lectura posterior respondió HTTP `200` con `X-DB: replica`.
+- Producto registrado: ID `39`, código `TEST-20261120-000854`.
+- El producto permanece registrado en la base de datos.
+
+En la configuración actual validada, app1 y app2 escriben en la primaria actual `db-replica` y
+leen desde la réplica actual `db-primary`. Durante la recuperación del failover histórico ambos
+destinos apuntaron temporalmente a `db-replica`; esa situación no debe confundirse con la
+configuración actual.
+
+La configuración efectiva utilizada corresponde al `.env` local, cuyos valores no se registran.
+La plantilla [`.env.example`](../../.env.example) conserva los destinos de la topología inicial
+(`db-primary` y `db-replica`) y no debe interpretarse como una copia de la configuración actual
+posterior al failover.
+
+## Primer experimento: apagado de una instancia de aplicación
+
+### Ejecución documentada
+
+Se realizó el apagado temporal de `app1` y se enviaron seis solicitudes autenticadas al Gateway.
+Las seis solicitudes respondieron HTTP `200` y fueron atendidas por `app2`, identificada mediante
+`X-Instance: app-2`. Posteriormente se restauró `app1` y se volvió a verificar el estado de los
+servicios.
+
+Este experimento demuestra que el balanceador logró continuar atendiendo solicitudes mediante
+la instancia restante. No existe una duración exacta medida para la ventana de caída, por lo que
+no se debe presentar un tiempo de recuperación que no haya sido registrado.
+
+## Criterios de los tres experimentos
+
+| Experimento | Estado respecto del criterio | Evidencia o limitación |
+|---|---|---|
+| 1. Apagado de una instancia de aplicación | Logrado parcialmente | Las seis solicitudes continuaron con HTTP `200` mediante `app2`; no quedó registrada una duración exacta de recuperación. |
+| 2. Interrupción de comunicación con la réplica | Parcial | Se simuló retraso de replicación pausando WAL, no corte de red. Durante la pausa el `GET` respondió HTTP `404`; al reanudar WAL volvió a responder HTTP `200`. |
+| 3. Caída de la primaria y promoción de la réplica | Logrado parcialmente | El failover, la promoción y la reincorporación fueron comprobados. RPO observado: `0 bytes`; RTO observado: `315,94 segundos`, por encima del objetivo de `300 segundos` en `15,94 segundos`. |
+
+## Segundo experimento: retraso de actualización de la réplica
+
+### Ejecución del 20 de noviembre de 2026
+
+Este experimento comprobó el comportamiento de las lecturas cuando la réplica deja de
+reproducir temporalmente los registros WAL. No se realizó un corte de red entre las bases de
+datos: se pausó la reproducción WAL en `db-primary` mediante `pg_wal_replay_pause()`.
+
+La topología utilizada fue:
+
+- Primaria actual: `db-replica`.
+- Réplica de lectura: `db-primary`.
+- Las aplicaciones escriben en la primaria y consultan productos desde la réplica.
+
+Antes del experimento se comprobó que la réplica estaba sincronizada. Luego:
+
+1. Se pausó la reproducción WAL en `db-primary`.
+2. Se confirmó que la pausa estaba activa.
+3. Se creó en la primaria el producto ID `41`, código `EXP-STALE-20261120-004232`.
+4. El `POST` respondió HTTP `201` con `X-DB: primary`.
+5. Un `GET` posterior consultó la réplica y respondió HTTP `404` con `X-DB: replica` y
+   `{"error":"Producto no encontrado"}`.
+6. Se reanudó la reproducción WAL mediante `pg_wal_replay_resume()`.
+7. Se confirmó que la pausa había terminado y que la conexión de replicación continuaba en
+   estado `streaming`.
+8. Una nueva consulta `GET` respondió HTTP `200` desde la réplica y mostró correctamente el
+   producto ID `41`.
+
+El tiempo registrado desde el inicio de la preparación del experimento hasta la consulta
+recuperada fue de `188,84 segundos`. Este valor no representa el tiempo exacto de recuperación
+ni el tiempo de catch-up de la réplica.
+
+### Limitaciones y aprendizaje
+
+- La pausa superó el límite recomendado de `60 segundos`; su duración exacta no fue medida.
+- El experimento simuló retraso de reproducción WAL, no una desconexión de red.
+- Durante el retraso, la aplicación pudo responder HTTP `404` aunque el producto ya existía en
+  la base primaria.
+- Tras reanudar la reproducción WAL, la consulta volvió a responder HTTP `200` desde la réplica.
+- La aplicación no resolvió automáticamente la lectura desactualizada mediante fallback,
+  reintento o espera; respondió según el estado que observó en la réplica.
+
 ## Recursos reales
 
 ### Servicios Docker Compose
@@ -356,15 +443,20 @@ Promover sin ejecutar `pg_promote()`:
 
 ```powershell
 $global:PromotionStart = Get-Date
+$global:PromotionTimestamp = $null
 "Inicio promoción: $($global:PromotionStart.ToString('o'))"
 
 docker compose exec -u postgres db-replica pg_ctl promote -D /var/lib/postgresql/data -w -t 60
 
-docker compose exec -T db-replica psql -U bodega_admin -d bodega -X -v ON_ERROR_STOP=1 -c `
-  "SELECT pg_is_in_recovery() AS in_recovery,
-          pg_current_wal_lsn() AS current_lsn,
-          timeline_id
-   FROM pg_control_checkpoint();"
+$replicaRecovery = docker compose exec -T db-replica psql -U bodega_admin -d bodega -X -v ON_ERROR_STOP=1 -tAc `
+  "SELECT pg_is_in_recovery();"
+
+if ($replicaRecovery.Trim() -ne 'f') {
+  throw 'Promoción no confirmada: db-replica continúa en recovery.'
+}
+
+$global:PromotionTimestamp = Get-Date
+"Promoción confirmada: $($global:PromotionTimestamp.ToString('o'))"
 ```
 
 El resultado esperado es `in_recovery=false`. El tiempo de promoción es una parte del RTO.
@@ -409,6 +501,14 @@ El contenedor `db-primary` puede seguir detenido mientras se recuperan las aplic
 
 Nota sobre el healthcheck: el healthcheck de `db-replica` comprueba la disponibilidad de PostgreSQL mediante `pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"`. No comprueba el rol del nodo ni su estado de recuperación; el rol debe confirmarse mediante `pg_is_in_recovery()`. No se modifica Compose en esta prueba.
 
+Las aplicaciones utilizan `/health/db` en su healthcheck interno. Esta ruta abre una
+conexión corta a `DB_PRIMARY_URL`, ejecuta `SELECT 1` y responde HTTP `200` si la primaria
+está disponible o HTTP `503` si no puede conectarse. El `/health` público continúa respondiendo
+HTTP `200` únicamente como comprobación del proceso de la aplicación.
+
+Este endpoint no confirma que las lecturas desde la réplica estén disponibles ni reemplaza las
+comprobaciones explícitas de `pg_is_in_recovery()` y `pg_stat_wal_receiver`.
+
 Verificar la configuración efectiva sin mostrar contraseñas:
 
 ```powershell
@@ -421,6 +521,7 @@ docker compose exec -T app2 python -c "import psycopg, os; p=psycopg.connect(os.
 ### Salud HTTP
 
 ```powershell
+$global:GatewayRecoveryTimestamp = $null
 curl.exe -i --max-time 10 http://127.0.0.1:8080/health
 # Después de confirmar que la respuesta del Gateway fue HTTP 200:
 $global:GatewayRecoveryTimestamp = Get-Date
@@ -452,11 +553,17 @@ Una prueba escrita requiere autorización separada y debe realizarse con una tra
 ### Medir RTO
 
 ```powershell
-$global:PromotionTimestamp = $null
+if ($null -eq $global:InterruptionStart -or
+    $null -eq $global:PromotionStart -or
+    $null -eq $global:PromotionTimestamp -or
+    $null -eq $global:GatewayRecoveryTimestamp) {
+  throw 'Faltan marcas de tiempo: interrupción, promoción confirmada o recuperación del Gateway.'
+}
 $rtoFullService = $global:GatewayRecoveryTimestamp - $global:InterruptionStart
-"RTO de detención a promoción: no calculable; hora exacta de promoción no registrada"
+$rtoPromotion = $global:PromotionTimestamp - $global:PromotionStart
+"RTO desde inicio de promoción hasta promoción confirmada: $($rtoPromotion.TotalSeconds) segundos"
 "RTO de interrupción a servicio Gateway recuperado: $($rtoFullService.TotalSeconds) segundos"
-"Hora de promoción: no registrada"
+"Hora de promoción confirmada: $($global:PromotionTimestamp.ToString('o'))"
 "Hora de recuperación del Gateway: $($global:GatewayRecoveryTimestamp.ToString('o'))"
 ```
 
@@ -616,6 +723,25 @@ docker compose exec -T app1 python -c "import os, psycopg; from psycopg.conninfo
 Esta comprobación abre conexiones explícitas a `db-primary` y `db-replica`, sin reemplazar texto dentro de una URL ni mostrar credenciales, y compara todos los registros y columnas de `productos` y `movimientos`, ordenados por `id`. No sustituye esta comparación por conteos.
 
 ## Verificaciones de split-brain y pérdida de conexión
+
+### Limitación del balanceador ante disponibilidad de la primaria
+
+Nginx utiliza detección pasiva mediante `max_fails=1` y `fail_timeout=5s` para las instancias
+`app1` y `app2` de `app_pool`. Como `proxy_next_upstream` incluye `http_503`, una solicitud
+puede reintentarse en la otra instancia y el servidor que devolvió ese error puede marcarse
+temporalmente como no disponible.
+
+Esta detección no equivale a consultar el estado `unhealthy` de Docker Compose ni a recibir
+directamente ese estado. Docker Compose marca una aplicación como `unhealthy`, pero no comunica
+automáticamente esa condición a Nginx.
+
+Además, esta detección pasiva no garantiza que se detecten todos los problemas de conexión con
+PostgreSQL, porque Nginx no consulta periódicamente el endpoint `/health/db` de las aplicaciones.
+El balanceador puede tener respuestas HTTP `503` sin que Nginx disponga de una comprobación
+activa de la disponibilidad primaria.
+
+La configuración mantiene el reintento ante errores HTTP y debe conservarse. No se implementa
+un fallback automático de lecturas ni se cambia la ruta de las escrituras.
 
 ### Detectar más de un primario
 
